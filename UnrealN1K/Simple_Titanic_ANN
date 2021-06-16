@@ -1,0 +1,64 @@
+import pandas as pd
+import tensorflow as tf
+import numpy as np
+from sklearn.preprocessing import LabelEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import OneHotEncoder
+from sklearn. model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import confusion_matrix, accuracy_score
+
+test = pd.read_csv(r'test.csv')
+train = pd.read_csv(r'train.csv')
+survived = pd.read_csv(r'gender_submission.csv')
+#independent variables are: pclass, PassengerId,Pclass,Sex,Age,SibSp,Parch,Ticket,Fare,Cabin,Embarked
+x = test.iloc[:, [1, 3, 4, 5, 6, 8, 10]].values
+#dependent variable is just the survived, we must add that first, however, to our testing dataset
+y = survived.values
+#Now we must do the Label Encoding; gender MUST be label encoded since there is a relationship between gender,pclass (both are label encoded as they have an order/hierarchy)
+Label_Encode = LabelEncoder()
+x[:, 1] = Label_Encode.fit_transform(x[:, 1])
+x[:, 0] = Label_Encode.fit_transform(x[:, 0])
+#Now for the one-hot encoding (stuff with no order or hierarchy): Embarked (for sure), Cabin (probably)
+ct = ColumnTransformer(transformers=[('encoder', OneHotEncoder(), [6])], remainder="passthrough")
+x = np.array(ct.fit_transform(x))
+#Split into training and testing data
+X_train, X_test, y_Train, y_Test = train_test_split(x, y, test_size=0.2, random_state=0)
+#Now we will have to do feature scaling to everything, regardless of whether or not it has numerical digits or not, scaler only fitted to training set to prevent information leakage
+sc = StandardScaler()
+#fit transform gets mean and stdev
+X_train = sc.fit_transform(X_train)
+X_test = sc.transform(X_test)
+#Now we split the data into training and testing data
+X_train, X_test, y_Train, y_Test = train_test_split(x, y, test_size=0.2, random_state=0)
+#Now we standardize with feature scaling to prevent information leakage, as well as fit:
+sc = StandardScaler()
+X_train = sc.fit_transform(X_train)
+X_test = sc.transform(X_test)
+#We have finished preprocessing; now for the real ANN as well as all the hidden layers
+ANN = tf.keras.models.Sequential()
+ANN.add(tf.keras.layers.Dense(units=116, activation='relu'))
+ANN.add(tf.keras.layers.Dense(units=116, activation='relu'))
+ANN.add(tf.keras.layers.Dense(units=116, activation='relu'))
+ANN.add(tf.keras.layers.Dense(units=116, activation='relu'))
+ANN.add(tf.keras.layers.Dense(units=116, activation='relu'))
+ANN.add(tf.keras.layers.Dense(units=116, activation='relu'))
+ANN.add(tf.keras.layers.Dense(units=116, activation='relu'))
+#Output layer. Not all output layers have units equal to 1, sigmoid gives us the probability that the binary outcome is 1 in addition to the prediction, predicting more than 2 categories would be SoftMax
+ANN.add(tf.keras.layers.Dense(units=1, activation="sigmoid"))
+#Now for the training, and compiling. We will be using the accuracy metrics to evaluate the Neural Network. We use loss=binary_crossentropy as we are predicting a binary value (0 or 1) if they leave or not, and for nonbinary classification we use categorical_crossentropy
+ANN.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
+ANN.fit(X_train, y_Train[:,1], batch_size=32, epochs=100)
+#Since the output layer was 1 (It does not make sense to have 2 output layers) we had to reshape the y_Train to the 1
+#Predict here
+#print(ann.predict(sc.transform([X_test])))
+#Confusion Matrix here
+#Now we can display the results and the differences. Y_Pred is the X_Test, while we show it right next to the Y_Test
+#We know that the Testing shapes are the samae: X has 9 columns, while Y has 2 columns, we do y_Test[:, 1] again
+y_Pred = ANN.predict(X_test)
+y_Pred = (y_Pred > 0.5)
+#print(np.concatenate((y_Pred.reshape(len(y_Pred), 1), y_Test[:, 1].reshape(len(y_Test[:, 1]), 1)), 1))
+#C0nfusion matrix time.
+Confusion_Matrix = confusion_matrix(y_Test[:, 1], y_Pred)
+print(Confusion_Matrix)
+print(accuracy_score(y_Test[:, 1], y_Pred))
